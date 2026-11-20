@@ -1,3 +1,8 @@
+# Unreleased
+
+## Fixes
+- **AgentRouter**: custom OpenAI/Anthropic-compatible nodes on `agentrouter.org` now receive the Codex `originator` identity and an idempotent English frame on the first user turn, preserving the original text while avoiding false `content-blocked` responses for non-English prompts.
+
 # v0.5.119 (2026-11-11)
 
 ## Features

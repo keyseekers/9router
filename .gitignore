@@ -15,6 +15,8 @@
 
 # next.js
 /.next/
+/.next-*-backup/
+/.next-*-candidate/
 /.next-cli-build/
 /out/
 cli/.build-home/
@@ -51,6 +53,7 @@ source/*
 .cursor/*
 docs/*
 !docs/ARCHITECTURE.md
+!docs/AGENTROUTER-COMPATIBILITY.md
 test/*
 open-sse/test/*
 RM.vn.md

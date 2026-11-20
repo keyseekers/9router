@@ -1,0 +1,82 @@
+name: Check upstream 9Router
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out patched fork
+        uses: actions/checkout@v4
+
+      - name: Compare tracked and upstream versions
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracked_sha="$(jq -r '.commit' .github/upstream-baseline.json)"
+          tracked_version="$(jq -r '.version' .github/upstream-baseline.json)"
+          upstream_sha="$(gh api repos/decolua/9router/commits/master --jq '.sha')"
+          upstream_version="$(curl -fsSL https://raw.githubusercontent.com/decolua/9router/master/cli/package.json | jq -r '.version')"
+
+          echo "tracked_sha=$tracked_sha" >> "$GITHUB_OUTPUT"
+          echo "tracked_version=$tracked_version" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=$upstream_version" >> "$GITHUB_OUTPUT"
+
+          if [[ "$tracked_sha" == "$upstream_sha" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Upstream is unchanged at v$tracked_version ($tracked_sha)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Upstream update detected"
+              echo
+              echo "- Patched baseline: v$tracked_version (\`${tracked_sha:0:12}\`)"
+              echo "- Upstream master: v$upstream_version (\`${upstream_sha:0:12}\`)"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open one update issue
+        if: steps.upstream.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACKED_VERSION: ${{ steps.upstream.outputs.tracked_version }}
+          TRACKED_SHA: ${{ steps.upstream.outputs.tracked_sha }}
+          UPSTREAM_VERSION: ${{ steps.upstream.outputs.upstream_version }}
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.upstream_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --json title \
+            --jq '[.[] | select(.title | startswith("Upstream 9Router update available:"))] | length')"
+
+          if [[ "$existing" != "0" ]]; then
+            echo "An open upstream-update issue already exists; not creating a duplicate."
+            exit 0
+          fi
+
+          body="$(printf '%s\n\n%s\n%s\n\n%s' \
+            'Upstream `decolua/9router` advanced beyond this fork patch baseline.' \
+            "- Current patched baseline: **v$TRACKED_VERSION** (\`$TRACKED_SHA\`)" \
+            "- New upstream master: **v$UPSTREAM_VERSION** (\`$UPSTREAM_SHA\`)" \
+            'Update procedure: merge/rebase upstream, preserve the AgentRouter Bahasa patch documented in `PATCH-MAINTENANCE.md`, run the focused tests and production build, then update `.github/upstream-baseline.json`.')"
+
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Upstream 9Router update available: v$UPSTREAM_VERSION" \
+            --body "$body"

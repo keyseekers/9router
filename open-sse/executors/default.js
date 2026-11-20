@@ -9,6 +9,11 @@ import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { injectReasoningContent } from "../utils/reasoningContentInjector.js";
 import { stripUnsupportedParams } from "../translator/concerns/paramSupport.js";
 import { extractClaudeSessionIdFromUserId } from "../utils/claudeCloaking.js";
+import {
+  agentRouterDefaultHeaders,
+  frameAgentRouterRequest,
+  resolveAgentRouterBaseUrl,
+} from "../services/agentRouter.js";
 
 // Auth header descriptors — derived from registry transport.auth, fallback to hardcoded defaults.
 const BEARER = { combined: true, header: "Authorization", scheme: "bearer" };
@@ -112,6 +117,11 @@ export class DefaultExecutor extends BaseExecutor {
       stripUnsupportedParams(this.provider, model, transformed);
     }
 
+    transformed = frameAgentRouterRequest(
+      resolveAgentRouterBaseUrl(credentials, this.config),
+      transformed,
+    );
+
     return injectReasoningContent({ provider: this.provider, model, body: transformed });
   }
 
@@ -203,7 +213,7 @@ export class DefaultExecutor extends BaseExecutor {
     return BEARER;
   }
 
-  buildHeaders(credentials, stream = true, url, model, body = null) {
+  buildHeaders(credentials, stream = true, url, model, body = null, providerOverrides = null) {
     const rt = credentials?.runtimeTransport;
     const headers = { "Content-Type": "application/json", ...(rt ? rt.headers : this.config.headers) };
     const desc = rt?.auth || AUTH_DESCRIPTORS[this.provider] || this.resolveAuthDescriptor();
@@ -270,6 +280,11 @@ export class DefaultExecutor extends BaseExecutor {
         }
       }
     }
+
+    Object.assign(headers, agentRouterDefaultHeaders(url, {
+      ...headers,
+      ...(providerOverrides?.headers || {}),
+    }));
 
     if (stream) headers["Accept"] = "text/event-stream";
     return headers;
