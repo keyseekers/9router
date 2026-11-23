@@ -1,6 +1,6 @@
 # AgentRouter language compatibility
 
-Patch baseline: `decolua/9router` `master` commit `1855aa44473e88feac9d3f131b9c0c5fc9706b68` (v0.5.119 source snapshot).
+Patch baseline: `decolua/9router` `master` commit `5ae63d22847e07042e235b40e1d926b65e509013` (v0.5.123 source snapshot).
 
 AgentRouter applies a client-identity and language gate before model inference. A valid request can therefore return HTTP 400 `content-blocked` when its first user turn is not English, even when the same request works in English.
 
@@ -16,6 +16,8 @@ AgentRouter applies a client-identity and language gate before model inference. 
 3. Preserve the original user text as a separate content block.
 
 The policy supports OpenAI Responses, Chat Completions, and Anthropic message bodies. It is idempotent, so retries do not add the frame twice.
+
+This is a compatibility mitigation, not a guarantee that every Indonesian prompt will be accepted. Unit tests verify the request transformation; AgentRouter may still reject particular content or later user turns. The patch does not implement cross-provider reasoning cleanup or rate-limit pacing.
 
 ## Security boundaries
 

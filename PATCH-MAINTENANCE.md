@@ -4,9 +4,10 @@ This fork tracks `decolua/9router` and carries one local compatibility patch for
 
 ## Current upstream baseline
 
-- Version: `0.5.119`
-- Commit: `1855aa44473e88feac9d3f131b9c0c5fc9706b68`
+- Version: `0.5.123`
+- Commit: `5ae63d22847e07042e235b40e1d926b65e509013`
 - Branch: `decolua/9router:master`
+- Fork: `https://github.com/keyseekers/9router`
 
 The machine-readable copy is `.github/upstream-baseline.json`. The scheduled `check-upstream.yml` workflow compares that commit with upstream every day and opens one issue when upstream advances.
 
@@ -41,7 +42,9 @@ The root `package.json` version is kept synchronized with the packaged CLI versi
 6. Run:
 
    ```text
-   npx vitest run tests/unit/agentrouter-compatibility.test.js
+   cd tests
+   npx vitest run unit/agentrouter-compatibility.test.js
+   cd ..
    npx eslint open-sse/config/agentRouter.js open-sse/services/agentRouter.js open-sse/executors/base.js open-sse/executors/default.js tests/unit/agentrouter-compatibility.test.js
    npm run build
    ```
@@ -50,3 +53,16 @@ The root `package.json` version is kept synchronized with the packaged CLI versi
 8. Push `master` and create/update a `patched-v<version>` tag.
 
 Never commit API keys, the 9Router SQLite database, `.env` files, `node_modules`, or generated `.next` builds.
+
+Keep `reaAllowEnabled` disabled unless the operator deliberately requests it. It is an upstream prompt-rewriting feature, not a dependency of the AgentRouter patch.
+
+## v0.5.123 verification (2026-11-23)
+
+Verified on Windows with Node 22.23.4; all test and build data was isolated from the running instance.
+
+- **PASS**: 14 AgentRouter tests, included in 52 focused executor tests; 254 security/fallback/translator tests; 9 native Node NVIDIA tests.
+- **PASS**: ESLint, production build, compiled patch marker, and isolated `/api/health` and `/api/version` checks. Unauthenticated management routes and an invalid inference API key returned HTTP 401.
+- **PASS**: alias baseline; no advisories returned for 221 installed production packages; no credential-like additions found by pattern scans of the update diff and upstream commit history.
+- **FAIL, also reproduced on clean upstream**: 7 header snapshots in the 37-file upstream test run (652 passed, 7 failed), and the QwenCloud provider-baseline transport mismatch. The fork does not alter these expectations or provider definitions.
+- **NOT TESTED**: live AgentRouter acceptance, live Codex account fallback, Linux/Docker runtime, and a complete application security audit.
+- **N/A**: production database migration and backup restore; this update only changes the fork, not the deployed home server or its database.

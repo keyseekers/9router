@@ -1,7 +1,7 @@
 {
   "repository": "decolua/9router",
   "branch": "master",
-  "version": "0.5.119",
-  "commit": "1855aa44473e88feac9d3f131b9c0c5fc9706b68",
-  "checked_at": "2026-11-20"
+  "version": "0.5.123",
+  "commit": "5ae63d22847e07042e235b40e1d926b65e509013",
+  "checked_at": "2026-11-23"
 }

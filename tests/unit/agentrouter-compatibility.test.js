@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AGENTROUTER_LANGUAGE_PREAMBLE } from "open-sse/config/agentRouter.js";
 import { DefaultExecutor } from "open-sse/executors/default.js";
 import {
@@ -6,6 +6,9 @@ import {
   frameAgentRouterRequest,
   isAgentRouterEndpoint,
 } from "open-sse/services/agentRouter.js";
+import { proxyAwareFetch } from "open-sse/utils/proxyFetch.js";
+
+vi.mock("open-sse/utils/proxyFetch.js", () => ({ proxyAwareFetch: vi.fn() }));
 
 const PROVIDER = "openai-compatible-responses-agentrouter-test";
 const BASE_URL = "https://agentrouter.org/v1";
@@ -126,5 +129,42 @@ describe("AgentRouter language framing", () => {
 
     expect(transformed.input[0].content[0].text).toBe(AGENTROUTER_LANGUAGE_PREAMBLE);
     expect(transformed.input[0].content[1].text).toBe(source.input);
+  });
+
+  it.each([200, 400])("keeps the patch and upstream status %i through DefaultExecutor.execute", async (status) => {
+    const source = {
+      model: "gpt-5.6-sol",
+      max_output_tokens: 64,
+      input: [{
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "Inspect the attached image." },
+          { type: "input_image", image_url: "data:image/png;base64,AA==" },
+        ],
+      }],
+    };
+    const before = structuredClone(source);
+    const upstream = new Response(JSON.stringify({ status }), { status });
+    proxyAwareFetch.mockResolvedValueOnce(upstream);
+
+    const result = await new DefaultExecutor(PROVIDER).execute({
+      model: source.model, body: source, stream: false, credentials,
+    });
+    const [url, options] = proxyAwareFetch.mock.calls.at(-1);
+    const outbound = JSON.parse(options.body);
+
+    expect(url).toBe(`${BASE_URL}/responses`);
+    expect(options.headers.originator).toBe("codex_cli_rs");
+    expect(options.headers.Authorization).toBe(`Bearer ${credentials.apiKey}`);
+    expect(outbound.input[0].role).toBe("user");
+    expect(outbound.input[0].content).toEqual([
+      { type: "input_text", text: AGENTROUTER_LANGUAGE_PREAMBLE },
+      ...before.input[0].content,
+    ]);
+    expect(outbound.max_output_tokens).toBe(64);
+    expect(source).toEqual(before);
+    expect(result.response).toBe(upstream);
+    expect(result.response.status).toBe(status);
   });
 });
